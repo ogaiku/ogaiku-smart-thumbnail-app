@@ -1,0 +1,1 @@
+# ogaiku-smart-thumbnail-app
