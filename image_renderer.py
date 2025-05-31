@@ -136,7 +136,7 @@ class ThumbnailRenderer:
             alignment = text_data.get('alignment', 'left')
             stroke_data = text_data.get('stroke', {})
             
-            print(f"テキスト描画: '{content}' at ({x}, {y})")
+            print(f"テキスト描画: '{content}' (role: {text_data.get('role', 'unknown')})")
             
             # フォント設定
             font = self._get_font(font_size, font_weight)
@@ -170,7 +170,7 @@ class ThumbnailRenderer:
             # メインテキスト描画
             draw.text((x, y), content, font=font, fill=color)
             
-            print(f"テキスト描画完了: '{content}'")
+            print(f"テキスト描画完了: '{content}' at ({x}, {y})")
             
         except Exception as e:
             print(f"テキスト描画エラー: {e}")
@@ -184,7 +184,7 @@ class ThumbnailRenderer:
             width = img_data.get('width', 300)
             height = img_data.get('height', 300)
             
-            print(f"画像描画: 位置({x}, {y}) サイズ({width}, {height})")
+            print(f"画像描画開始: サイズ({width}, {height})")
             
             # 画像の縦横比を保持してリサイズ
             original_ratio = user_image.width / user_image.height
@@ -210,7 +210,7 @@ class ThumbnailRenderer:
             final_x = max(0, min(final_x, self.canvas_size[0] - resized_image.width))
             final_y = max(0, min(final_y, self.canvas_size[1] - resized_image.height))
             
-            print(f"最終配置位置: ({final_x}, {final_y}) 最終サイズ: ({resized_image.width}, {resized_image.height})")
+            print(f"画像配置完了: 位置({final_x}, {final_y}) サイズ({resized_image.width}, {resized_image.height})")
             
             # 透過画像の場合はアルファ合成
             if resized_image.mode == 'RGBA':

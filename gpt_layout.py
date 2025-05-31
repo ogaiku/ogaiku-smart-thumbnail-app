@@ -22,55 +22,45 @@ class GPTLayoutGenerator:
         """
         
         system_prompt = """
-        あなたはYouTubeサムネイルの専門デザイナーです。
-        ユーザーが指定したタイトルとサブタイトルを必ず使用して、魅力的なレイアウトを作成してください。
+        YouTubeサムネイルのJSONレイアウトを生成してください。
         
-        重要な制約:
-        1. ユーザーが指定したタイトルとサブタイトルの文字列を一字一句変更せずに使用する
-        2. 「YouTube」や「サムネイル」などの汎用的な文字は使用しない
-        3. 画像は提供された向きを考慮して適切に配置する
-        4. 文字は大きく、読みやすく配置する
-        5. 背景とのコントラストを重視する
+        重要：
+        - ユーザー指定のタイトル・サブタイトルを変更しない
+        - 完全で有効なJSONのみを返す
+        - 説明文やマークダウンは不要
         
-        必ず以下のJSON形式で応答してください。説明文や追加のテキストは一切含めないでください：
-
+        必須JSON構造：
         {
           "background": {
             "type": "gradient",
-            "gradientStart": "#カラーコード",
-            "gradientEnd": "#カラーコード",
+            "gradientStart": "#FF4500",
+            "gradientEnd": "#FFA500",
             "gradientDirection": "horizontal"
           },
           "elements": [
             {
               "type": "text",
               "role": "title",
-              "content": "ユーザー指定のタイトルをそのまま",
+              "content": "指定されたタイトル",
               "x": 50,
               "y": 100,
               "fontSize": 72,
               "color": "#FFFFFF",
               "fontWeight": "bold",
               "alignment": "left",
-              "stroke": {
-                "color": "#000000",
-                "width": 4
-              }
+              "stroke": {"color": "#000000", "width": 4}
             },
             {
-              "type": "text", 
+              "type": "text",
               "role": "subtitle",
-              "content": "ユーザー指定のサブタイトルをそのまま",
+              "content": "指定されたサブタイトル",
               "x": 50,
               "y": 200,
               "fontSize": 36,
               "color": "#FFFF00",
-              "fontWeight": "bold",
+              "fontWeight": "bold", 
               "alignment": "left",
-              "stroke": {
-                "color": "#000000",
-                "width": 3
-              }
+              "stroke": {"color": "#000000", "width": 3}
             },
             {
               "type": "image",
@@ -82,12 +72,8 @@ class GPTLayoutGenerator:
             }
           ]
         }
-
-        絶対に守ること:
-        - 応答は上記のJSON形式のみ
-        - 説明文や```json```のマークダウンは不要
-        - ユーザーが指定したタイトルとサブタイトルを変更しない
-        - title roleとsubtitle roleの両方のテキスト要素を必ず含める
+        
+        このJSONをベースに、座標・色・サイズを調整してください。
         """
         
         messages = [
@@ -117,12 +103,12 @@ class GPTLayoutGenerator:
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=messages,
-                max_tokens=2000,
-                temperature=0.1  # より一貫した出力のため低く設定
+                max_tokens=3000,  # トークン数を増加
+                temperature=0.1
             )
             
             response_text = response.choices[0].message.content
-            print(f"GPTレスポンス（最初の200文字）: {response_text[:200] if response_text else 'None'}")
+            print(f"GPTレスポンス全体: {response_text}")
             
             if not response_text:
                 print("エラー: GPTからの応答が空です")
@@ -130,7 +116,7 @@ class GPTLayoutGenerator:
             
             response_text = response_text.strip()
             
-            # JSONの抽出
+            # JSONの抽出（マークダウンを除去）
             if "```json" in response_text:
                 json_start = response_text.find("```json") + 7
                 json_end = response_text.find("```", json_start)
@@ -144,15 +130,14 @@ class GPTLayoutGenerator:
                     json_end = len(response_text)
                 response_text = response_text[json_start:json_end].strip()
             
-            print(f"抽出されたJSON（最初の200文字）: {response_text[:200]}")
+            print(f"抽出されたJSON全体: {response_text}")
             
             if not response_text or response_text == "":
                 print("エラー: JSON抽出後の文字列が空です")
                 return self._get_fallback_layout(title, subtitle)
             
-            # JSONの先頭と末尾を確認
+            # JSONの先頭と末尾を確認・修正
             if not response_text.startswith('{'):
-                # { の位置を探す
                 brace_start = response_text.find('{')
                 if brace_start != -1:
                     response_text = response_text[brace_start:]
@@ -161,13 +146,25 @@ class GPTLayoutGenerator:
                     return self._get_fallback_layout(title, subtitle)
             
             if not response_text.endswith('}'):
-                # 最後の } の位置を探す
                 brace_end = response_text.rfind('}')
                 if brace_end != -1:
                     response_text = response_text[:brace_end + 1]
                 else:
                     print("エラー: JSONの終了が見つかりません")
+                    print("不完全なJSON、フォールバックを使用します")
                     return self._get_fallback_layout(title, subtitle)
+            
+            # JSON構造の検証
+            brace_count = response_text.count('{') - response_text.count('}')
+            if brace_count != 0:
+                print(f"警告: JSONの括弧が不一致です (差分: {brace_count})")
+                # 括弧を補完する試み
+                if brace_count > 0:
+                    response_text += '}' * brace_count
+                else:
+                    response_text = response_text[:response_text.rfind('}') + 1]
+            
+            print(f"最終的なJSON: {response_text}")
             
             layout_data = json.loads(response_text)
             
@@ -178,7 +175,8 @@ class GPTLayoutGenerator:
             
         except json.JSONDecodeError as e:
             print(f"JSON解析エラー: {e}")
-            print(f"解析対象の文字列: '{response_text[:500] if 'response_text' in locals() else 'undefined'}'")
+            print(f"解析対象の文字列: '{response_text[:1000] if 'response_text' in locals() else 'undefined'}'")
+            print("フォールバックレイアウトを使用します")
             return self._get_fallback_layout(title, subtitle)
         except Exception as e:
             print(f"GPT API呼び出しエラー: {e}")
